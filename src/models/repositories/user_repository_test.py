@@ -1,48 +1,63 @@
 from .user_repository import UserRepository
-from src.models.settings.db_connection_handly import db_connection_handler
-import pytest
+from unittest.mock import Mock
 
-@pytest.fixture(autouse=True)
-def setup_database():
-    # Conecta ao banco de dados
-    db_connection_handler.connect()
-    conn = db_connection_handler.get_connection()
-    
-    # Cria a tabela users se não existir
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL UNIQUE,
-            password TEXT NOT NULL,
-            balance INTEGER DEFAULT 0
-        )
-    ''')
-    conn.commit()
-    
-    yield  # Aqui os testes serão executados
-    
-    # Limpeza após os testes (opcional)
-    cursor.execute("DELETE FROM users")
-    conn.commit()
-    conn.close()
+class MockCursor:
+    def __init__(self) -> None:
+        self.execute = Mock()
+        self.fetchone = Mock()
 
-def test_repository():
-    conn = db_connection_handler.get_connection()
-    repo = UserRepository(conn)
+class MockConnection:
+    def __init__(self) -> None:
+        self.cursor = Mock(return_value=MockCursor())
+        self.commit = Mock()
 
-    username = "Bob Esponja"
-    password = "123Rocket!"
+def test_registry_user():
+    username = "fred"
+    password = "Yabadabado"
 
-    # Testa o registro
-    user = repo.get_user_by_username(username)
-    print()
-    print(user)
-    
-    # Verifica se o usuário foi inserido
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
-    result = cursor.fetchone()
-    
-    assert result is not None
-    assert result[1] == username  # username está na posição 1
+    mock_connection = MockConnection()
+    repo = UserRepository(mock_connection)
+
+    repo.registry_user(username, password)
+
+    cursor = mock_connection.cursor.return_value
+ 
+    assert "INSERT INTO users" in cursor.execute.call_args[0][0]
+    assert "(username, password, balance)" in cursor.execute.call_args[0][0]
+    assert "VALUES" in cursor.execute.call_args[0][0]
+    assert cursor.execute.call_args[0][1] == (username, password, 0)
+
+def test_edit_balance():
+    user_id = 234
+    balance = 100.11
+
+    mock_connection = MockConnection()
+    repo = UserRepository(mock_connection)
+
+    repo.edit_balance(user_id, balance)
+
+    cursor = mock_connection.cursor.return_value
+ 
+    assert "UPDATE users" in cursor.execute.call_args[0][0]
+    assert "SET balance = ?" in cursor.execute.call_args[0][0]
+    assert "WHERE id = ?" in cursor.execute.call_args[0][0]
+    assert cursor.execute.call_args[0][1] == (balance, user_id)
+
+    mock_connection.commit.assert_called_once()
+
+def test_get_user_by_username():
+    username = "meuUsername"
+
+    mock_connection = MockConnection()
+    repo = UserRepository(mock_connection)
+
+    repo.get_user_by_username(username)
+
+    cursor = mock_connection.cursor.return_value
+ 
+    assert "SELECT id, username, password" in cursor.execute.call_args[0][0]
+    assert "FROM users" in cursor.execute.call_args[0][0]
+    assert "WHERE username = ?" in cursor.execute.call_args[0][0]
+    assert cursor.execute.call_args[0][1] == (username,)
+
+    cursor.fetchone.assert_called_once()
