@@ -14,6 +14,7 @@ disable=
       C0303, #trailing-whitespace
       W0612, #unused-variable
       W0102, #dangerous-default-value
+      W0621, #redefined-outer-name
 
 # Analyse import fallback blocks. This can be used to support both Python 2 and
 # 3 compatible code, which means that the block might have code that exists
