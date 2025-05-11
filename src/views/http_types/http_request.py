@@ -6,5 +6,5 @@ class HttpRequest:
                  token_infos: dict = None) -> None:
         self.body = body
         self.headers = headers
-        self.param = params
+        self.params = params
         self.token_infos = token_infos
